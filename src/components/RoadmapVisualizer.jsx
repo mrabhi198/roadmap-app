@@ -5,12 +5,21 @@ const RoadmapVisualizer = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [completedTopics, setCompletedTopics] = useState({});
   const [showProgressPanel, setShowProgressPanel] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
     // Load progress from memory (in a real app, this would be from localStorage)
     const savedProgress = {};
     setCompletedTopics(savedProgress);
+    
+    // Check if user is already logged in
+    const savedUser = JSON.parse(sessionStorage.getItem('roadmapUser') || 'null');
+    if (savedUser) {
+      setUser(savedUser);
+      loadUserProgress(savedUser.email);
+    }
   }, []);
 
   const roadmapData = [
@@ -165,10 +174,57 @@ const RoadmapVisualizer = () => {
 
   const toggleTopicCompletion = (week, track, topicIndex) => {
     const key = `${week}-${track}-${topicIndex}`;
-    setCompletedTopics(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    const newCompletedTopics = {
+      ...completedTopics,
+      [key]: !completedTopics[key]
+    };
+    setCompletedTopics(newCompletedTopics);
+    
+    // Save progress if user is logged in
+    if (user) {
+      saveUserProgress(user.email, newCompletedTopics);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      // Simulate Google login (in real app, use Google OAuth)
+      const mockUser = {
+        email: 'user@example.com',
+        name: 'John Doe',
+        picture: 'https://via.placeholder.com/40x40?text=JD'
+      };
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setUser(mockUser);
+      sessionStorage.setItem('roadmapUser', JSON.stringify(mockUser));
+      loadUserProgress(mockUser.email);
+    } catch (error) {
+      console.error('Login failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    sessionStorage.removeItem('roadmapUser');
+    sessionStorage.removeItem('roadmapProgress');
+    setCompletedTopics({});
+  };
+
+  const saveUserProgress = (email, progress) => {
+    // In real app, this would be an API call
+    sessionStorage.setItem('roadmapProgress', JSON.stringify(progress));
+  };
+
+  const loadUserProgress = (email) => {
+    // In real app, this would be an API call
+    const savedProgress = JSON.parse(sessionStorage.getItem('roadmapProgress') || '{}');
+    setCompletedTopics(savedProgress);
   };
 
   const getWeekProgress = (week) => {
@@ -212,64 +268,116 @@ const RoadmapVisualizer = () => {
     const completedWeeks = getCompletedWeeks();
 
     return (
-      <div className={`progress-panel ${showProgressPanel ? 'visible' : ''}`}>
-        <div className="progress-header">
-          <h3>📊 Progress Dashboard</h3>
-          <button 
-            className="close-btn"
-            onClick={() => setShowProgressPanel(false)}
-          >
-            ✕
-          </button>
-        </div>
+      <>
+        {/* Backdrop */}
+        <div 
+          className={`progress-backdrop ${showProgressPanel ? 'visible' : ''}`}
+          onClick={() => setShowProgressPanel(false)}
+        />
         
-        <div className="progress-stats">
-          <div className="stat-card">
-            <div className="stat-value">{overallProgress.toFixed(1)}%</div>
-            <div className="stat-label">Overall Progress</div>
+        <div className={`progress-panel ${showProgressPanel ? 'visible' : ''}`}>
+          <div className="progress-header">
+            <h3>📊 Progress Dashboard</h3>
+            <button 
+              className="close-btn"
+              onClick={() => setShowProgressPanel(false)}
+            >
+              ✕
+            </button>
           </div>
-          
-          <div className="stat-card">
-            <div className="stat-value">{completedWeeks}/12</div>
-            <div className="stat-label">Weeks Completed</div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-value">{Math.round((12 - completedWeeks) * 7)}</div>
-            <div className="stat-label">Days Remaining</div>
-          </div>
-        </div>
 
-        <div className="overall-progress-bar">
-          <div className="progress-label">Journey Progress</div>
-          <div className="progress-track">
-            <div 
-              className="progress-fill-overall" 
-              style={{ width: `${overallProgress}%` }}
-            ></div>
-          </div>
-          <div className="progress-percentage">{overallProgress.toFixed(1)}%</div>
-        </div>
-
-        <div className="week-progress-list">
-          <h4>Weekly Progress</h4>
-          {roadmapData.map(week => {
-            const progress = getWeekProgress(week.week);
-            return (
-              <div key={week.week} className="week-progress-item">
-                <span className="week-label">Week {week.week}</span>
-                <div className="mini-progress-bar">
-                  <div 
-                    className="mini-progress-fill" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
+          {/* User Section */}
+          <div className="user-section">
+            {user ? (
+              <div className="user-info">
+                <div className="user-avatar">
+                  <img src={user.picture} alt={user.name} />
                 </div>
-                <span className="progress-text">{progress.toFixed(0)}%</span>
+                <div className="user-details">
+                  <div className="user-name">{user.name}</div>
+                  <div className="user-email">{user.email}</div>
+                </div>
+                <button className="logout-btn" onClick={handleLogout}>
+                  Logout
+                </button>
               </div>
-            );
-          })}
+            ) : (
+              <div className="login-section">
+                <div className="login-message">
+                  <span>🔐</span>
+                  <p>Login to save your progress across devices</p>
+                </div>
+                <button 
+                  className="google-login-btn"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="loading-spinner">⏳</span>
+                  ) : (
+                    <>
+                      <svg className="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      Continue with Google
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <div className="progress-stats">
+            <div className="stat-card">
+              <div className="stat-value">{overallProgress.toFixed(1)}%</div>
+              <div className="stat-label">Overall Progress</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-value">{completedWeeks}/12</div>
+              <div className="stat-label">Weeks Completed</div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-value">{Math.round((12 - completedWeeks) * 7)}</div>
+              <div className="stat-label">Days Remaining</div>
+            </div>
+          </div>
+
+          <div className="overall-progress-bar">
+            <div className="progress-label">Journey Progress</div>
+            <div className="progress-track">
+              <div 
+                className="progress-fill-overall" 
+                style={{ width: `${overallProgress}%` }}
+              ></div>
+            </div>
+            <div className="progress-percentage">{overallProgress.toFixed(1)}%</div>
+          </div>
+
+          <div className="week-progress-list">
+            <h4>Weekly Progress</h4>
+            {roadmapData.map(week => {
+              const progress = getWeekProgress(week.week);
+              return (
+                <div key={week.week} className="week-progress-item">
+                  <span className="week-label">Week {week.week}</span>
+                  <div className="mini-progress-bar">
+                    <div 
+                      className="mini-progress-fill" 
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  <span className="progress-text">{progress.toFixed(0)}%</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </>
     );
   };
 
@@ -432,6 +540,24 @@ const RoadmapVisualizer = () => {
           box-shadow: 0 8px 25px rgba(0, 123, 255, 0.4);
         }
 
+        .progress-backdrop {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          opacity: 0;
+          visibility: hidden;
+          transition: all 0.3s ease;
+          z-index: 998;
+        }
+
+        .progress-backdrop.visible {
+          opacity: 1;
+          visibility: visible;
+        }
+
         .progress-panel {
           position: fixed;
           top: 0;
@@ -477,6 +603,116 @@ const RoadmapVisualizer = () => {
 
         .close-btn:hover {
           color: #007bff;
+        }
+
+        .user-section {
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 1px solid rgba(0, 123, 255, 0.2);
+        }
+
+        .user-info {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .user-avatar img {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          border: 2px solid rgba(0, 123, 255, 0.3);
+        }
+
+        .user-details {
+          flex: 1;
+        }
+
+        .user-name {
+          font-weight: 600;
+          color: #ffffff;
+          margin-bottom: 0.25rem;
+        }
+
+        .user-email {
+          font-size: 0.8rem;
+          color: #888;
+        }
+
+        .logout-btn {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: #ff6b6b;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 0.8rem;
+          transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+          background: rgba(255, 107, 107, 0.1);
+          border-color: #ff6b6b;
+        }
+
+        .login-section {
+          text-align: center;
+        }
+
+        .login-message {
+          margin-bottom: 1.5rem;
+        }
+
+        .login-message span {
+          font-size: 2rem;
+          display: block;
+          margin-bottom: 0.5rem;
+        }
+
+        .login-message p {
+          color: #b0b0b0;
+          font-size: 0.9rem;
+          margin: 0;
+        }
+
+        .google-login-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.8rem;
+          width: 100%;
+          background: #ffffff;
+          color: #333;
+          border: none;
+          border-radius: 12px;
+          padding: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .google-login-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .google-login-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        .google-icon {
+          flex-shrink: 0;
+        }
+
+        .loading-spinner {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         .progress-stats {
